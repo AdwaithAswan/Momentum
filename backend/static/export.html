@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Momentum — Export Report</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app-shell">
+
+  <header class="topbar" id="topbar"></header>
+  <nav class="sidebar" id="sidebar"></nav>
+
+  <main class="main">
+    <div class="page-header">
+      <div class="breadcrumb">MOMENTUM / <a href="dashboard.html">DASHBOARD</a> / EXPORT</div>
+      <h1>Export Report</h1>
+      <p>Generate a downloadable summary of flagged transactions for formal audit documentation.</p>
+    </div>
+
+    <div class="two-col">
+
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div class="panel">
+          <div class="panel-header">Export Options</div>
+          <div class="panel-body" style="display:flex;flex-direction:column;gap:16px">
+
+            <div>
+              <label class="text-sm text-dim mb8" style="display:block">Format</label>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <label class="flex align-center gap8" style="cursor:pointer;font-size:13px">
+                  <input type="radio" name="fmt" value="csv" checked> CSV — scored transactions with all fields
+                </label>
+                <label class="flex align-center gap8" style="cursor:pointer;font-size:13px">
+                  <input type="radio" name="fmt" value="summary"> CSV — summary by anomaly type
+                </label>
+                <label class="flex align-center gap8" style="cursor:pointer;font-size:13px">
+                  <input type="radio" name="fmt" value="json"> JSON — full dataset with metadata
+                </label>
+              </div>
+            </div>
+
+            <hr class="divider">
+
+            <div>
+              <label class="text-sm text-dim mb8" style="display:block">Include</label>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <label class="flex align-center gap8" style="cursor:pointer;font-size:13px">
+                  <input type="checkbox" id="inc-high" checked> High risk transactions
+                </label>
+                <label class="flex align-center gap8" style="cursor:pointer;font-size:13px">
+                  <input type="checkbox" id="inc-med" checked> Medium risk transactions
+                </label>
+                <label class="flex align-center gap8" style="cursor:pointer;font-size:13px">
+                  <input type="checkbox" id="inc-low"> Low risk transactions
+                </label>
+                <label class="flex align-center gap8" style="cursor:pointer;font-size:13px">
+                  <input type="checkbox" id="inc-clean"> Clean transactions (for context)
+                </label>
+              </div>
+            </div>
+
+            <hr class="divider">
+
+            <div>
+              <label class="text-sm text-dim mb8" style="display:block">Date Range (optional)</label>
+              <div class="flex gap8">
+                <input class="input flex-1" type="date" id="exp-from">
+                <span class="text-dim" style="padding:7px 2px">to</span>
+                <input class="input flex-1" type="date" id="exp-to">
+              </div>
+            </div>
+
+            <hr class="divider">
+
+            <div>
+              <label class="text-sm text-dim mb8" style="display:block">Auditor Notes</label>
+              <textarea class="input" id="notes" rows="4" style="width:100%;resize:vertical"
+                placeholder="Add any notes or context for this report…"></textarea>
+            </div>
+
+            <button class="btn btn-primary" id="export-btn" style="width:100%;justify-content:center;padding:10px">
+              &#8595; Export Report
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:16px">
+
+        <div class="panel">
+          <div class="panel-header">
+            Report Preview
+            <span class="tag" id="preview-count"></span>
+          </div>
+          <div class="panel-body" style="padding:0">
+            <table style="width:100%">
+              <thead>
+                <tr><th>ID</th><th>Account</th><th>Date</th><th>Amount</th><th>Score</th><th>Risk</th></tr>
+              </thead>
+              <tbody id="preview-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">Run Metadata</div>
+          <div class="panel-body">
+            <div class="detail-grid" id="meta-grid"></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">Previous Exports</div>
+          <div class="panel-body" style="padding:0">
+            <table>
+              <thead><tr><th>Filename</th><th>Date</th><th>Records</th><th></th></tr></thead>
+              <tbody>
+                <tr>
+                  <td class="mono" style="font-size:11px">audit_report_2026-02-28.csv</td>
+                  <td class="dim">2026-02-28</td><td>14</td>
+                  <td><button class="btn btn-ghost btn-sm" onclick="Utils.toast('Re-downloading…')">&#8595;</button></td>
+                </tr>
+                <tr>
+                  <td class="mono" style="font-size:11px">audit_report_2026-01-31.csv</td>
+                  <td class="dim">2026-01-31</td><td>11</td>
+                  <td><button class="btn btn-ghost btn-sm" onclick="Utils.toast('Re-downloading…')">&#8595;</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="data.js"></script>
+<script>
+  document.getElementById('topbar').innerHTML = Utils.topbar('ready');
+  document.getElementById('sidebar').innerHTML = Utils.sidebar('export');
+
+  /* Load live run summary */
+  let R = RUN_SUMMARY;
+  try {
+    const stored = localStorage.getItem('run_summary');
+    if (stored) R = JSON.parse(stored);
+  } catch (_) {}
+
+  /* Render metadata panel */
+  const today = new Date().toLocaleDateString('en-IN', { day:'2-digit', month:'2-digit', year:'numeric' });
+  document.getElementById('meta-grid').innerHTML = `
+    <div class="detail-item"><div class="dl">Source File</div><div class="dv mono" style="font-size:11px">${R.file ?? '—'}</div></div>
+    <div class="detail-item"><div class="dl">Total Records</div><div class="dv mono">${(R.total ?? 0).toLocaleString()}</div></div>
+    <div class="detail-item"><div class="dl">Model</div><div class="dv text-sm">Isolation Forest</div></div>
+    <div class="detail-item"><div class="dl">Contamination</div><div class="dv mono">${((R.contamination ?? 0.05) * 100)}%</div></div>
+    <div class="detail-item"><div class="dl">Export Date</div><div class="dv mono">${today}</div></div>
+    <div class="detail-item"><div class="dl">Total Flagged</div><div class="dv mono">${R.flagged ?? '—'}</div></div>
+  `;
+
+  /* Set default date range from live data */
+  const ALL_DATA = getTransactions();
+  const dates = ALL_DATA.map(t => t.date).filter(Boolean).sort();
+  if (dates.length) {
+    document.getElementById('exp-from').value = dates[0];
+    document.getElementById('exp-to').value   = dates[dates.length - 1];
+  }
+
+  function getExportData() {
+    const incHigh  = document.getElementById('inc-high').checked;
+    const incMed   = document.getElementById('inc-med').checked;
+    const incLow   = document.getElementById('inc-low').checked;
+    const incClean = document.getElementById('inc-clean').checked;
+    const from     = document.getElementById('exp-from').value;
+    const to       = document.getElementById('exp-to').value;
+
+    return ALL_DATA.filter(t => {
+      if (from && t.date < from) return false;
+      if (to   && t.date > to)   return false;
+      if (t.flag === 0 && !incClean) return false;
+      if (t.flag === 1) {
+        if (t.risk === 'high'   && !incHigh) return false;
+        if (t.risk === 'medium' && !incMed)  return false;
+        if (t.risk === 'low'    && !incLow)  return false;
+      }
+      return true;
+    });
+  }
+
+  function updatePreview() {
+    const data = getExportData();
+    document.getElementById('preview-count').textContent = data.length + ' rows';
+    document.getElementById('preview-body').innerHTML = data.slice(0, 8).map(t => `
+      <tr>
+        <td class="mono" style="font-size:11px">${t.id}</td>
+        <td class="mono" style="font-size:11px">${t.account}</td>
+        <td class="dim">${t.date}</td>
+        <td class="mono">${Utils.fmt.currency(t.amount)}</td>
+        <td class="mono">${t.flag ? t.score : '—'}</td>
+        <td>${t.flag ? `<span class="risk ${t.risk}">${t.risk.toUpperCase()}</span>` : '<span style="color:var(--green);font-size:11px">&#10003;</span>'}</td>
+      </tr>
+    `).join('') + (data.length > 8 ? `<tr><td colspan="6" class="text-faint text-sm" style="padding:8px 14px">… and ${data.length - 8} more rows</td></tr>` : '');
+  }
+
+  ['inc-high','inc-med','inc-low','inc-clean','exp-from','exp-to']
+    .forEach(id => document.getElementById(id).addEventListener('change', updatePreview));
+
+  document.getElementById('export-btn').addEventListener('click', () => {
+    const fmt   = document.querySelector('input[name="fmt"]:checked').value;
+    const data  = getExportData();
+    const notes = document.getElementById('notes').value.trim();
+
+    if (fmt === 'csv' || fmt === 'summary') {
+      let csvRows;
+      if (fmt === 'csv') {
+        const headers = ['transaction_id','account_id','date','time','transaction_type','amount','channel','branch_code','anomaly_score','anomaly_flag','risk_level','anomaly_type'];
+        csvRows = [
+          headers.join(','),
+          ...data.map(t => [
+            t.id, t.account, t.date, t.time, `"${t.type}"`,
+            t.amount, t.channel, t.branch, t.score, t.flag, t.risk, `"${t.anomaly}"`
+          ].join(','))
+        ];
+        if (notes) csvRows.push(`# Notes: "${notes.replace(/\n/g, ' ')}"`);
+      } else {
+        const summary = {};
+        data.filter(t => t.flag).forEach(t => {
+          (t.anomaly || '').split(',').forEach(a => {
+            const k = a.trim();
+            if (!k) return;
+            if (!summary[k]) summary[k] = { type:k, count:0, high:0, medium:0, low:0 };
+            summary[k].count++;
+            summary[k][t.risk]++;
+          });
+        });
+        csvRows = [
+          'anomaly_type,total_count,high,medium,low',
+          ...Object.values(summary).map(s => `"${s.type}",${s.count},${s.high},${s.medium},${s.low}`)
+        ];
+      }
+      downloadText(csvRows.join('\n'), `audit_report_${new Date().toISOString().slice(0,10)}.csv`, 'text/csv');
+    } else {
+      const payload = {
+        meta: { ...R, export_date: new Date().toISOString().slice(0,10), notes },
+        transactions: data
+      };
+      downloadText(JSON.stringify(payload, null, 2), `audit_report_${new Date().toISOString().slice(0,10)}.json`, 'application/json');
+    }
+    Utils.toast('Report exported successfully.');
+  });
+
+  function downloadText(content, filename, mime) {
+    const blob = new Blob([content], { type: mime });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  updatePreview();
+</script>
+</body>
+</html>

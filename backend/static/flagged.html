@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Momentum — Flagged Transactions</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app-shell">
+
+  <header class="topbar" id="topbar"></header>
+  <nav class="sidebar" id="sidebar"></nav>
+
+  <main class="main">
+    <div class="page-header">
+      <div class="breadcrumb">MOMENTUM / <a href="dashboard.html">DASHBOARD</a> / FLAGGED</div>
+      <h1>Flagged Transactions</h1>
+      <p>All transactions scored above the anomaly threshold, sorted by risk score.</p>
+    </div>
+
+    <div class="table-wrap">
+      <div class="table-toolbar">
+        <span class="title">Transactions</span>
+        <input class="input" id="search" placeholder="Search ID, account, type…" style="width:220px">
+        <select class="select" id="filter-risk">
+          <option value="">All risks</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+        </select>
+        <select class="select" id="filter-type">
+          <option value="">All types</option>
+        </select>
+        <input class="input" id="filter-date-from" type="date" title="From date">
+        <input class="input" id="filter-date-to"   type="date" title="To date">
+        <button class="btn btn-ghost btn-sm" id="clear-filters">Clear</button>
+        <span style="flex:1"></span>
+        <span id="count-label" class="text-faint text-sm"></span>
+        <a href="account.html" class="btn btn-ghost btn-sm">Account view &#8594;</a>
+      </div>
+
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr>
+              <th data-col="id">Transaction ID &#8661;</th>
+              <th data-col="account">Account &#8661;</th>
+              <th data-col="date">Date &#8661;</th>
+              <th data-col="type">Type &#8661;</th>
+              <th data-col="amount">Amount &#8661;</th>
+              <th data-col="score">Risk Score &#8661;</th>
+              <th data-col="risk">Risk Level &#8661;</th>
+              <th data-col="anomaly">Anomaly Type</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="txn-body"></tbody>
+        </table>
+      </div>
+      <div class="pagination" id="pagination"></div>
+    </div>
+  </main>
+</div>
+
+<!-- Transaction detail modal -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modal-title">Transaction Detail</h2>
+      <button class="modal-close" id="modal-close">&#10005;</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<script src="data.js"></script>
+<script>
+  document.getElementById('topbar').innerHTML = Utils.topbar('ready');
+  document.getElementById('sidebar').innerHTML = Utils.sidebar('flagged');
+
+  /* Use getTransactions() so real backend data is shown after upload */
+  const ALL_DATA = getTransactions();
+  const flagged  = ALL_DATA.filter(t => t.flag === 1);
+
+  /* Populate type filter */
+  const types = [...new Set(flagged.map(t => t.type))].sort();
+  const typeSelect = document.getElementById('filter-type');
+  types.forEach(ty => {
+    const o = document.createElement('option');
+    o.value = ty; o.textContent = ty;
+    typeSelect.appendChild(o);
+  });
+
+  let filtered = [...flagged];
+  let sortCol  = 'score';
+  let sortAsc  = false;
+  let page     = 1;
+  const PER    = 10;
+
+  function applyFilters() {
+    const q    = document.getElementById('search').value.toLowerCase();
+    const risk = document.getElementById('filter-risk').value;
+    const type = document.getElementById('filter-type').value;
+    const from = document.getElementById('filter-date-from').value;
+    const to   = document.getElementById('filter-date-to').value;
+
+    filtered = flagged.filter(t => {
+      if (q && !`${t.id} ${t.account} ${t.type} ${t.anomaly}`.toLowerCase().includes(q)) return false;
+      if (risk && t.risk !== risk) return false;
+      if (type && t.type !== type) return false;
+      if (from && t.date < from)   return false;
+      if (to   && t.date > to)     return false;
+      return true;
+    });
+    filtered = Utils.sortBy(filtered, sortCol, sortAsc);
+    page = 1;
+    render();
+  }
+
+  function render() {
+    const slice = Utils.paginate(filtered, page, PER);
+    document.getElementById('count-label').textContent = filtered.length + ' results';
+
+    document.getElementById('txn-body').innerHTML = slice.length ? slice.map(t => `
+      <tr data-id="${t.id}" style="cursor:pointer">
+        <td class="mono">${t.id}</td>
+        <td class="mono">${t.account}</td>
+        <td class="dim">${t.date} <span class="text-faint">${t.time}</span></td>
+        <td>${t.type}</td>
+        <td class="mono">${Utils.fmt.currency(t.amount)}</td>
+        <td>
+          <div class="score-bar-wrap">
+            <div class="score-bar">
+              <div class="score-bar-fill" style="width:${t.score}%;background:${Utils.scoreColor(t.score)}"></div>
+            </div>
+            <div class="score-val">${t.score}</div>
+          </div>
+        </td>
+        <td><span class="risk ${t.risk}">${t.risk.toUpperCase()}</span></td>
+        <td class="text-sm text-dim">${t.anomaly || '—'}</td>
+        <td><button class="btn btn-ghost btn-sm detail-btn" data-id="${t.id}">Detail</button></td>
+      </tr>
+    `).join('') : '<tr><td colspan="9"><div class="empty"><div class="icon">&#8856;</div><p>No transactions match filters.</p></div></td></tr>';
+
+    renderPagination();
+  }
+
+  function renderPagination() {
+    const total = Math.ceil(filtered.length / PER);
+    const pag   = document.getElementById('pagination');
+    if (total <= 1) { pag.innerHTML = ''; return; }
+    let html = `<span class="info">Page ${page} of ${total}</span>`;
+    html += `<button class="page-btn" onclick="goPage(${page-1})" ${page===1?'disabled':''}>&#8249;</button>`;
+    for (let i = 1; i <= total; i++) {
+      if (total > 7 && Math.abs(i - page) > 2 && i !== 1 && i !== total) {
+        if (i === 2 || i === total - 1) html += `<span class="page-btn" style="cursor:default;border:none">…</span>`;
+        continue;
+      }
+      html += `<button class="page-btn ${i===page?'active':''}" onclick="goPage(${i})">${i}</button>`;
+    }
+    html += `<button class="page-btn" onclick="goPage(${page+1})" ${page===total?'disabled':''}>&#8250;</button>`;
+    pag.innerHTML = html;
+  }
+
+  window.goPage = n => {
+    const total = Math.ceil(filtered.length / PER);
+    if (n < 1 || n > total) return;
+    page = n; render();
+  };
+
+  /* Sort on header click */
+  document.querySelectorAll('thead th[data-col]').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.col;
+      sortAsc  = sortCol === col ? !sortAsc : false;
+      sortCol  = col;
+      filtered = Utils.sortBy(filtered, sortCol, sortAsc);
+      render();
+    });
+  });
+
+  ['search','filter-risk','filter-type','filter-date-from','filter-date-to']
+    .forEach(id => document.getElementById(id).addEventListener('input', applyFilters));
+
+  document.getElementById('clear-filters').addEventListener('click', () => {
+    ['search','filter-risk','filter-type','filter-date-from','filter-date-to']
+      .forEach(id => { document.getElementById(id).value = ''; });
+    applyFilters();
+  });
+
+  /* Row / Detail button click → modal */
+  document.getElementById('txn-body').addEventListener('click', e => {
+    const btn = e.target.closest('.detail-btn');
+    const row = e.target.closest('tr[data-id]');
+    if (!btn && !row) return;
+    const id = (btn || row).dataset.id;
+    const t  = ALL_DATA.find(x => x.id === id);
+    if (t) openModal(t);
+  });
+
+  function openModal(t) {
+    document.getElementById('modal-title').textContent = t.id;
+    document.getElementById('modal-body').innerHTML = `
+      <div class="flex align-center gap12 mb16">
+        <span class="risk ${t.risk}" style="font-size:13px;padding:4px 10px">${t.risk.toUpperCase()} RISK</span>
+        <div class="score-bar-wrap" style="flex:1">
+          <div class="score-bar" style="height:8px">
+            <div class="score-bar-fill" style="width:${t.score}%;background:${Utils.scoreColor(t.score)}"></div>
+          </div>
+          <div class="score-val" style="font-size:14px;font-weight:600">${t.score}/100</div>
+        </div>
+      </div>
+      <div class="detail-grid mb16">
+        <div class="detail-item"><div class="dl">Transaction ID</div><div class="dv mono">${t.id}</div></div>
+        <div class="detail-item"><div class="dl">Account ID</div><div class="dv mono"><a href="account.html?acc=${t.account}" style="color:var(--accent2);text-decoration:none">${t.account} &#8594;</a></div></div>
+        <div class="detail-item"><div class="dl">Date &amp; Time</div><div class="dv">${t.date} at ${t.time}</div></div>
+        <div class="detail-item"><div class="dl">Transaction Type</div><div class="dv">${t.type}</div></div>
+        <div class="detail-item"><div class="dl">Amount</div><div class="dv mono" style="font-size:16px;font-weight:600">${Utils.fmt.currency(t.amount)}</div></div>
+        <div class="detail-item"><div class="dl">Channel</div><div class="dv">${t.channel}</div></div>
+        <div class="detail-item"><div class="dl">Branch</div><div class="dv mono">${t.branch}</div></div>
+        <div class="detail-item"><div class="dl">Anomaly Flag</div><div class="dv">${t.flag === 1 ? '&#9873; Flagged' : '&#10003; Clean'}</div></div>
+      </div>
+      <hr class="divider">
+      <div class="mb8">
+        <div class="dl" style="font-family:var(--mono);font-size:10px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px">Detected Anomaly Types</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          ${t.anomaly ? t.anomaly.split(',').map(a => `<span class="tag active">${a.trim()}</span>`).join('') : '<span class="text-faint text-sm">None</span>'}
+        </div>
+      </div>
+      <hr class="divider">
+      <div class="flex gap8 mt8">
+        <a href="account.html?acc=${t.account}" class="btn btn-ghost btn-sm">View Account &#8594;</a>
+        <button class="btn btn-ghost btn-sm" onclick="Utils.toast('Marked for investigation.')">Mark for Investigation</button>
+        <button class="btn btn-ghost btn-sm" onclick="Utils.toast('Dismissed.')">Dismiss</button>
+      </div>
+    `;
+    document.getElementById('modal').classList.add('open');
+  }
+
+  document.getElementById('modal-close').addEventListener('click', () => {
+    document.getElementById('modal').classList.remove('open');
+  });
+  document.getElementById('modal').addEventListener('click', e => {
+    if (e.target === document.getElementById('modal')) document.getElementById('modal').classList.remove('open');
+  });
+
+  applyFilters();
+</script>
+</body>
+</html>

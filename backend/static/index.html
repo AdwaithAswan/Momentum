@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Momentum — Upload &amp; Process</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app-shell">
+
+  <header class="topbar" id="topbar"></header>
+  <nav class="sidebar" id="sidebar"></nav>
+
+  <main class="main">
+    <div class="page-header">
+      <div class="breadcrumb">MOMENTUM / UPLOAD</div>
+      <h1>Upload &amp; Process</h1>
+      <p>Upload a transaction CSV or Excel file to run the anomaly detection pipeline.</p>
+    </div>
+
+    <!-- Step pipeline indicator -->
+    <div class="pipeline">
+      <div class="pipeline-step" id="step-upload">
+        <div class="pipeline-dot">1</div>
+        <div class="pipeline-label">Upload File</div>
+      </div>
+      <div class="pipeline-step" id="step-validate">
+        <div class="pipeline-dot">2</div>
+        <div class="pipeline-label">Validate</div>
+      </div>
+      <div class="pipeline-step" id="step-process">
+        <div class="pipeline-dot">3</div>
+        <div class="pipeline-label">Process</div>
+      </div>
+      <div class="pipeline-step" id="step-score">
+        <div class="pipeline-dot">4</div>
+        <div class="pipeline-label">Score</div>
+      </div>
+      <div class="pipeline-step" id="step-done">
+        <div class="pipeline-dot">5</div>
+        <div class="pipeline-label">Ready</div>
+      </div>
+    </div>
+
+    <div class="two-col mt16">
+
+      <!-- Left: drop zone -->
+      <div>
+        <div class="panel">
+          <div class="panel-header">Input File</div>
+          <div class="panel-body">
+            <div class="dropzone" id="dropzone">
+              <div class="dz-icon">&#8679;</div>
+              <div class="dz-title">Drop CSV or Excel file here</div>
+              <div class="dz-sub">or click to browse — .csv and .xlsx supported</div>
+              <input type="file" id="file-input" accept=".csv,.xlsx" style="display:none">
+            </div>
+
+            <div id="file-info" style="display:none" class="mt16">
+              <div class="flex align-center gap8 mb8">
+                <span style="font-size:20px">&#128196;</span>
+                <div>
+                  <div id="file-name" style="font-size:13px;font-weight:500;"></div>
+                  <div id="file-meta" class="text-faint text-sm"></div>
+                </div>
+                <button class="btn btn-ghost btn-sm" id="clear-btn" style="margin-left:auto">&#10005; Clear</button>
+              </div>
+            </div>
+
+            <div class="mt16">
+              <button class="btn btn-primary" id="run-btn" disabled style="width:100%;justify-content:center;padding:10px">
+                &#9654; Run Pipeline
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel mt16">
+          <div class="panel-header">Expected Format</div>
+          <div class="panel-body">
+            <p class="text-sm text-dim mb8">The file should contain these columns (order does not matter):</p>
+            <table style="width:100%">
+              <thead><tr><th>Column</th><th>Type</th><th>Required</th></tr></thead>
+              <tbody>
+                <tr><td class="mono">transaction_id</td>  <td class="dim">string</td>    <td class="text-green">Yes</td></tr>
+                <tr><td class="mono">account_id</td>      <td class="dim">string</td>    <td class="text-green">Yes</td></tr>
+                <tr><td class="mono">date</td>            <td class="dim">YYYY-MM-DD</td><td class="text-green">Yes</td></tr>
+                <tr><td class="mono">time</td>            <td class="dim">HH:MM</td>     <td class="text-green">Yes</td></tr>
+                <tr><td class="mono">transaction_type</td><td class="dim">string</td>    <td class="text-green">Yes</td></tr>
+                <tr><td class="mono">amount</td>          <td class="dim">numeric</td>   <td class="text-green">Yes</td></tr>
+                <tr><td class="mono">channel</td>         <td class="dim">string</td>    <td class="text-dim">Optional</td></tr>
+                <tr><td class="mono">branch_code</td>     <td class="dim">string</td>    <td class="text-dim">Optional</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: run log + recent runs -->
+      <div>
+        <div class="panel">
+          <div class="panel-header">
+            Run Log
+            <span id="log-status" class="tag">idle</span>
+          </div>
+          <div class="panel-body" id="log-body"
+               style="font-family:var(--mono);font-size:11.5px;color:var(--text2);min-height:180px;line-height:2">
+            <span class="text-faint">— Waiting for file upload —</span>
+          </div>
+        </div>
+
+        <div class="panel mt16">
+          <div class="panel-header">Recent Runs</div>
+          <div class="panel-body" style="padding:0">
+            <table style="width:100%">
+              <thead><tr><th>File</th><th>Date</th><th>Flagged</th><th></th></tr></thead>
+              <tbody id="recent-runs"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel mt16" style="border-color:#2a2a1a">
+          <div class="panel-header" style="color:#6a6a3a">&#9889; Backend Status</div>
+          <div class="panel-body text-sm" style="color:#6a6a3a;line-height:1.8">
+            Ensure Flask is running on <span style="font-family:var(--mono)">localhost:5000</span>.<br>
+            Run: <span style="font-family:var(--mono)">python run.py</span> from the backend folder.<br>
+            Without the backend, mock data is shown across all pages.
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script src="data.js"></script>
+<script>
+  document.getElementById('topbar').innerHTML = Utils.topbar('idle');
+  document.getElementById('sidebar').innerHTML = Utils.sidebar('upload');
+
+  const recentRuns = [
+    { file:'transactions_march_2026.csv', date:'2026-03-22', flagged:20 },
+    { file:'transactions_feb_2026.csv',   date:'2026-02-28', flagged:14 },
+    { file:'transactions_jan_2026.csv',   date:'2026-01-31', flagged:11 },
+  ];
+  document.getElementById('recent-runs').innerHTML = recentRuns.map(r => `
+    <tr>
+      <td class="mono" style="font-size:11px">${r.file}</td>
+      <td class="dim">${r.date}</td>
+      <td><span class="risk high">${r.flagged}</span></td>
+      <td><a href="dashboard.html" class="btn btn-ghost btn-sm">View</a></td>
+    </tr>
+  `).join('');
+
+  /* Drop zone */
+  const dz     = document.getElementById('dropzone');
+  const fi     = document.getElementById('file-input');
+  const runBtn = document.getElementById('run-btn');
+  let selectedFile = null;
+
+  dz.addEventListener('click',     ()  => fi.click());
+  dz.addEventListener('dragover',  e   => { e.preventDefault(); dz.classList.add('dragover'); });
+  dz.addEventListener('dragleave', ()  => dz.classList.remove('dragover'));
+  dz.addEventListener('drop',      e   => { e.preventDefault(); dz.classList.remove('dragover'); handleFile(e.dataTransfer.files[0]); });
+  fi.addEventListener('change',    ()  => handleFile(fi.files[0]));
+
+  function handleFile(f) {
+    if (!f) return;
+    if (!f.name.match(/\.(csv|xlsx)$/i)) {
+      Utils.toast('Only .csv and .xlsx files are supported.', 'error');
+      return;
+    }
+    selectedFile = f;
+    document.getElementById('file-info').style.display = 'block';
+    document.getElementById('file-name').textContent = f.name;
+    document.getElementById('file-meta').textContent = (f.size / 1024).toFixed(1) + ' KB';
+    dz.style.display = 'none';
+    runBtn.disabled = false;
+    log('File selected: ' + f.name, 'ok');
+    setStep('upload');
+  }
+
+  document.getElementById('clear-btn').addEventListener('click', () => {
+    selectedFile = null;
+    document.getElementById('file-info').style.display = 'none';
+    dz.style.display = '';
+    runBtn.disabled = true;
+    fi.value = '';
+    resetSteps();
+    document.getElementById('log-body').innerHTML = '<span class="text-faint">— Waiting for file upload —</span>';
+    document.getElementById('log-status').textContent = 'idle';
+    document.getElementById('log-status').style.color = '';
+    runBtn.textContent = '&#9654; Run Pipeline';
+    runBtn.onclick = null;
+  });
+
+  /* Pipeline run */
+  runBtn.addEventListener('click', async () => {
+    if (!selectedFile || runBtn.textContent.includes('Dashboard')) {
+      if (runBtn.textContent.includes('Dashboard')) window.location.href = 'dashboard.html';
+      return;
+    }
+
+    runBtn.disabled = true;
+    runBtn.textContent = '⏳ Processing…';
+    document.getElementById('log-status').textContent = 'running';
+    document.getElementById('log-status').style.color = 'var(--yellow)';
+    document.getElementById('log-body').innerHTML = '';
+
+    log('Uploading ' + selectedFile.name + ' ...');
+    setStep('validate');
+    await delay(200);
+
+    try {
+      log('POST ' + BACKEND_URL + '/upload');
+      setStep('process');
+
+      log('Connecting to backend — attempt 1...');
+      const result = await fetchBackendData(selectedFile, 1);
+      log('Server responded OK', 'ok');
+      setStep('score');
+      await delay(150);
+
+      const rows   = result.data ?? [];
+      const mapped = mapBackendToUI(rows);
+
+      localStorage.setItem('transactions', JSON.stringify(rows));
+      localStorage.setItem('run_summary',  JSON.stringify(buildRunSummary(result, mapped)));
+
+      const flagCount = result.fraud_count ?? mapped.filter(t => t.flag === 1).length;
+      log(`Done — ${flagCount} anomalies in ${result.total_records ?? rows.length} records.`, 'ok');
+      setStep('done');
+
+      document.getElementById('log-status').textContent = 'done';
+      document.getElementById('log-status').style.color = 'var(--green)';
+      Utils.toast('Analysis complete — ' + flagCount + ' anomalies found.');
+
+      runBtn.disabled = false;
+      runBtn.innerHTML = '&#9654; View Dashboard';
+      runBtn.onclick = () => { window.location.href = 'dashboard.html'; };
+
+    } catch (err) {
+      console.error(err);
+      const isTimeout = err.message.includes('timed out');
+      const isNetwork = err.message.toLowerCase().includes('fetch') ||
+                        err.message.toLowerCase().includes('failed') ||
+                        err.message.toLowerCase().includes('network');
+      if (isTimeout) {
+        log('ERROR: Request timed out. Check Flask is running on port 5000.', 'error');
+        Utils.toast('Timed out — is the backend running?', 'error');
+      } else if (isNetwork) {
+        log('ERROR: Cannot reach backend. Start Flask with: python run.py', 'error');
+        Utils.toast('Cannot reach backend — see log for help.', 'error');
+      } else {
+        log('ERROR: ' + err.message, 'error');
+        Utils.toast('Backend error — check log for details.', 'error');
+      }
+      document.getElementById('log-status').textContent = 'error';
+      document.getElementById('log-status').style.color = 'var(--accent)';
+      runBtn.disabled = false;
+      runBtn.textContent = '&#9654; Retry';
+    }
+  });
+
+  function log(msg, cls) {
+    const b = document.getElementById('log-body');
+    if (!msg) return;
+    const line = document.createElement('div');
+    line.textContent = new Date().toTimeString().slice(0, 8) + '  ' + msg;
+    if (cls === 'ok')    line.style.color = 'var(--green)';
+    if (cls === 'error') line.style.color = 'var(--accent2)';
+    b.appendChild(line);
+    b.scrollTop = b.scrollHeight;
+  }
+
+  const stepOrder = ['upload', 'validate', 'process', 'score', 'done'];
+  function setStep(active) {
+    const idx = stepOrder.indexOf(active);
+    stepOrder.forEach((s, i) => {
+      const el = document.getElementById('step-' + s);
+      if (el) el.className = 'pipeline-step' + (i < idx ? ' done' : i === idx ? ' active' : '');
+    });
+  }
+  function resetSteps() {
+    stepOrder.forEach(s => { const el = document.getElementById('step-' + s); if (el) el.className = 'pipeline-step'; });
+  }
+
+  const delay = ms => new Promise(r => setTimeout(r, ms));
+</script>
+</body>
+</html>

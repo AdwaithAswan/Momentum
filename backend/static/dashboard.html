@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Momentum — Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app-shell">
+
+  <header class="topbar" id="topbar"></header>
+  <nav class="sidebar" id="sidebar"></nav>
+
+  <main class="main">
+    <div class="page-header">
+      <div class="breadcrumb">MOMENTUM / <a href="dashboard.html">DASHBOARD</a></div>
+      <h1>Overview</h1>
+      <p>Summary of the most recent pipeline run — <span id="run-file" class="text-mono" style="font-size:12px"></span></p>
+    </div>
+
+    <div class="stat-grid" id="stat-grid"></div>
+
+    <div class="two-col">
+
+      <div class="panel">
+        <div class="panel-header">Anomalies by Type</div>
+        <div class="panel-body">
+          <div class="bar-chart" id="type-chart"></div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div class="panel">
+          <div class="panel-header">Risk Distribution</div>
+          <div class="panel-body">
+            <div class="bar-chart" id="risk-chart"></div>
+            <hr class="divider">
+            <div class="flex gap16 mt8">
+              <div style="flex:1;text-align:center">
+                <div class="text-faint text-sm mb8">High</div>
+                <div id="pct-high" class="text-mono" style="font-size:22px;color:#ff6b6b"></div>
+              </div>
+              <div style="flex:1;text-align:center">
+                <div class="text-faint text-sm mb8">Medium</div>
+                <div id="pct-med" class="text-mono" style="font-size:22px;color:#e0ac44"></div>
+              </div>
+              <div style="flex:1;text-align:center">
+                <div class="text-faint text-sm mb8">Low</div>
+                <div id="pct-low" class="text-mono" style="font-size:22px;color:#52c491"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">Model Info</div>
+          <div class="panel-body">
+            <div class="detail-grid">
+              <div class="detail-item"><div class="dl">Algorithm</div><div class="dv mono" id="m-algo"></div></div>
+              <div class="detail-item"><div class="dl">Contamination</div><div class="dv mono" id="m-cont"></div></div>
+              <div class="detail-item"><div class="dl">Records Processed</div><div class="dv mono" id="m-total"></div></div>
+              <div class="detail-item"><div class="dl">Processing Time</div><div class="dv mono" id="m-time"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel mt16">
+      <div class="panel-header">
+        Top 5 Highest-Risk Transactions
+        <a href="flagged.html" class="btn btn-ghost btn-sm">View all &#8594;</a>
+      </div>
+      <div id="top-table"></div>
+    </div>
+
+    <!-- ── NEW: Scatter Plot + Timeline Heatmap ─────────────────────────── -->
+    <div class="two-col mt16">
+
+      <!-- Risk Scatter Plot -->
+      <div class="panel">
+        <div class="panel-header">
+          Risk Scatter — Amount vs Anomaly Score
+          <span class="text-faint text-sm" style="font-weight:400;letter-spacing:0">each dot = one flagged transaction</span>
+        </div>
+        <div class="panel-body" style="padding:12px 8px 8px">
+          <canvas id="scatter-canvas" style="width:100%;max-height:280px"></canvas>
+          <div style="display:flex;gap:16px;margin-top:10px;justify-content:center">
+            <span style="font-size:11px;color:#ff6b6b">&#9679; High</span>
+            <span style="font-size:11px;color:#e0ac44">&#9679; Medium</span>
+            <span style="font-size:11px;color:#52c491">&#9679; Low</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Timeline Heatmap -->
+      <div class="panel">
+        <div class="panel-header">
+          Anomaly Timeline — Daily Activity
+          <span class="text-faint text-sm" style="font-weight:400;letter-spacing:0">darker = more anomalies</span>
+        </div>
+        <div class="panel-body">
+          <div id="heatmap-wrap" style="overflow-x:auto"></div>
+          <div style="display:flex;align-items:center;gap:6px;margin-top:10px;justify-content:flex-end">
+            <span style="font-size:10px;color:var(--text3)">Less</span>
+            <span style="display:inline-block;width:12px;height:12px;background:var(--bg4);border-radius:2px"></span>
+            <span style="display:inline-block;width:12px;height:12px;background:rgba(204,51,51,0.25);border-radius:2px"></span>
+            <span style="display:inline-block;width:12px;height:12px;background:rgba(204,51,51,0.55);border-radius:2px"></span>
+            <span style="display:inline-block;width:12px;height:12px;background:rgba(204,51,51,0.80);border-radius:2px"></span>
+            <span style="display:inline-block;width:12px;height:12px;background:#cc3333;border-radius:2px"></span>
+            <span style="font-size:10px;color:var(--text3)">More</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="data.js"></script>
+<script>
+  document.getElementById('topbar').innerHTML = Utils.topbar('ready');
+  document.getElementById('sidebar').innerHTML = Utils.sidebar('dashboard');
+
+  /* Load live summary if available, else fall back to static mock */
+  let R = RUN_SUMMARY;
+  try {
+    const stored = localStorage.getItem('run_summary');
+    if (stored) R = JSON.parse(stored);
+  } catch (_) {}
+
+  document.getElementById('run-file').textContent = R.file;
+
+  /* Stat cards */
+  const total   = R.total   || 1;
+  const flagged = R.flagged || 0;
+  const stats = [
+    { label:'Total Transactions', value: total.toLocaleString(),                sub:'in uploaded file' },
+    { label:'Flagged',            value: flagged,                               sub:'anomalies detected', highlight: true },
+    { label:'High Risk',          value: R.highRisk   ?? 0,                    sub:'require immediate review' },
+    { label:'Medium Risk',        value: R.mediumRisk ?? 0,                    sub:'warrant investigation' },
+    { label:'Low Risk',           value: R.lowRisk    ?? 0,                    sub:'monitor only' },
+    { label:'Flagged Rate',       value: Utils.fmt.pct(flagged / total),       sub:'of total transactions' },
+  ];
+  document.getElementById('stat-grid').innerHTML = stats.map(s => `
+    <div class="stat-card ${s.highlight ? 'highlight' : ''}">
+      <div class="label">${s.label}</div>
+      <div class="value">${s.value}</div>
+      <div class="sub">${s.sub}</div>
+    </div>
+  `).join('');
+
+  /* Build anomaly type summary from live transactions */
+  const DATA = getTransactions();
+  const flaggedTxns = DATA.filter(t => t.flag === 1);
+
+  /* Derive live anomaly type counts from real data if available */
+  const liveTypeCounts = {};
+  flaggedTxns.forEach(t => {
+    if (!t.anomaly) return;
+    t.anomaly.split(',').forEach(a => {
+      const k = a.trim();
+      if (!k) return;
+      if (!liveTypeCounts[k]) liveTypeCounts[k] = { name:k, count:0, risk:'medium' };
+      liveTypeCounts[k].count++;
+      if (t.risk === 'high')   liveTypeCounts[k].risk = 'high';
+    });
+  });
+
+  const typeData = Object.keys(liveTypeCounts).length
+    ? Object.values(liveTypeCounts)
+    : ANOMALY_TYPES;
+
+  const maxType = Math.max(...typeData.map(a => a.count), 1);
+  document.getElementById('type-chart').innerHTML = [...typeData]
+    .sort((a, b) => b.count - a.count)
+    .map(a => {
+      const pct = (a.count / maxType * 100).toFixed(0);
+      const cls = a.risk === 'high' ? '' : a.risk === 'medium' ? 'yellow' : 'green';
+      return `
+        <div class="bar-row">
+          <div class="bar-label" title="${a.name}">${a.name}</div>
+          <div class="bar-track"><div class="bar-fill ${cls}" style="width:${pct}%"></div></div>
+          <div class="bar-count">${a.count}</div>
+        </div>`;
+    }).join('');
+
+  /* Risk distribution */
+  const high   = R.highRisk   ?? flaggedTxns.filter(t => t.risk === 'high').length;
+  const medium = R.mediumRisk ?? flaggedTxns.filter(t => t.risk === 'medium').length;
+  const low    = R.lowRisk    ?? flaggedTxns.filter(t => t.risk === 'low').length;
+  const total2 = Math.max(high + medium + low, 1);
+
+  document.getElementById('risk-chart').innerHTML = `
+    <div class="bar-row">
+      <div class="bar-label">High</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${high/total2*100}%;background:#ff6b6b"></div></div>
+      <div class="bar-count">${high}</div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label">Medium</div>
+      <div class="bar-track"><div class="bar-fill yellow" style="width:${medium/total2*100}%"></div></div>
+      <div class="bar-count">${medium}</div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label">Low</div>
+      <div class="bar-track"><div class="bar-fill green" style="width:${low/total2*100}%"></div></div>
+      <div class="bar-count">${low}</div>
+    </div>
+  `;
+
+  document.getElementById('pct-high').textContent = Utils.fmt.pct(high / total2);
+  document.getElementById('pct-med').textContent  = Utils.fmt.pct(medium / total2);
+  document.getElementById('pct-low').textContent  = Utils.fmt.pct(low / total2);
+
+  /* Model info */
+  document.getElementById('m-algo').textContent  = R.model ?? 'IsolationForest';
+  document.getElementById('m-cont').textContent  = ((R.contamination ?? 0.05) * 100) + '%';
+  document.getElementById('m-total').textContent = (R.total ?? DATA.length).toLocaleString();
+  document.getElementById('m-time').textContent  = ((R.processingMs ?? 0) / 1000).toFixed(2) + 's';
+
+  /* Top 5 table — uses live data */
+  const top5 = [...flaggedTxns].sort((a, b) => b.score - a.score).slice(0, 5);
+  document.getElementById('top-table').innerHTML = `
+    <table>
+      <thead><tr>
+        <th>Transaction ID</th><th>Account</th><th>Date</th>
+        <th>Type</th><th>Amount</th><th>Risk Score</th><th>Risk</th>
+      </tr></thead>
+      <tbody>
+        ${top5.map(t => `
+          <tr onclick="window.location='flagged.html'" style="cursor:pointer">
+            <td class="mono">${t.id}</td>
+            <td class="mono">${t.account}</td>
+            <td class="dim">${t.date}</td>
+            <td>${t.type}</td>
+            <td class="mono">${Utils.fmt.currency(t.amount)}</td>
+            <td>
+              <div class="score-bar-wrap">
+                <div class="score-bar"><div class="score-bar-fill" style="width:${t.score}%;background:${Utils.scoreColor(t.score)}"></div></div>
+                <div class="score-val">${t.score}</div>
+              </div>
+            </td>
+            <td><span class="risk ${t.risk}">${t.risk.toUpperCase()}</span></td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+
+
+  /* ── SCATTER PLOT: Amount vs Anomaly Score ──────────────────────────── */
+  (function buildScatter() {
+    const flaggedData = DATA.filter(t => t.flag === 1);
+    if (!flaggedData.length) return;
+
+    const colorMap = { high: '#ff6b6b', medium: '#e0ac44', low: '#52c491' };
+
+    const points = flaggedData.map(t => ({
+      x: t.amount,
+      y: t.score,
+      r: 5,
+      risk: t.risk,
+      label: t.id + ' — ' + t.account,
+    }));
+
+    // Split into 3 datasets by risk so we get correct colours
+    const datasets = ['high', 'medium', 'low'].map(risk => ({
+      label: risk.charAt(0).toUpperCase() + risk.slice(1),
+      data: points.filter(p => p.risk === risk).map(p => ({ x: p.x, y: p.y, label: p.label })),
+      backgroundColor: colorMap[risk] + 'cc',
+      borderColor:     colorMap[risk],
+      borderWidth: 1,
+      pointRadius: 5,
+      pointHoverRadius: 7,
+    }));
+
+    const ctx = document.getElementById('scatter-canvas');
+    if (!ctx) return;
+
+    new Chart(ctx, {
+      type: 'scatter',
+      data: { datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        animation: { duration: 600 },
+        plugins: {
+          legend: {
+            display: false,  // we use custom legend HTML below
+          },
+          tooltip: {
+            callbacks: {
+              label: item => {
+                const d = item.raw;
+                return [
+                  d.label ?? '',
+                  'Amount: Rs.' + Number(item.parsed.x).toLocaleString('en-IN'),
+                  'Score: ' + item.parsed.y,
+                ];
+              }
+            },
+            backgroundColor: '#1c1c1c',
+            borderColor: '#3a3a3a',
+            borderWidth: 1,
+            titleColor: '#e8e8e8',
+            bodyColor: '#9a9a9a',
+            padding: 10,
+          }
+        },
+        scales: {
+          x: {
+            title: { display: true, text: 'Transaction Amount (Rs.)', color: '#5a5a5a', font: { size: 11 } },
+            ticks: {
+              color: '#5a5a5a',
+              font: { size: 10 },
+              callback: v => 'Rs.' + Number(v).toLocaleString('en-IN'),
+            },
+            grid: { color: 'rgba(255,255,255,0.04)' },
+          },
+          y: {
+            title: { display: true, text: 'Anomaly Score (0-100)', color: '#5a5a5a', font: { size: 11 } },
+            min: 0, max: 100,
+            ticks: { color: '#5a5a5a', font: { size: 10 } },
+            grid: { color: 'rgba(255,255,255,0.04)' },
+          }
+        }
+      }
+    });
+  })();
+
+  /* ── TIMELINE HEATMAP: Daily Anomaly Calendar ───────────────────────── */
+  (function buildHeatmap() {
+    const flaggedData = DATA.filter(t => t.flag === 1 && t.date);
+    if (!flaggedData.length) return;
+
+    // Count anomalies per date
+    const dateCounts = {};
+    flaggedData.forEach(t => {
+      dateCounts[t.date] = (dateCounts[t.date] || 0) + 1;
+    });
+
+    // Determine date range — last 12 weeks from most recent date
+    const allDates  = Object.keys(dateCounts).sort();
+    const lastDate  = new Date(allDates[allDates.length - 1]);
+    const firstDate = new Date(lastDate);
+    firstDate.setDate(firstDate.getDate() - 83); // 12 weeks = 84 days
+
+    // Build array of all days in range
+    const days = [];
+    for (let d = new Date(firstDate); d <= lastDate; d.setDate(d.getDate() + 1)) {
+      const iso = d.toISOString().slice(0, 10);
+      days.push({ date: iso, count: dateCounts[iso] || 0, dow: d.getDay() });
+    }
+
+    const maxCount = Math.max(...Object.values(dateCounts), 1);
+
+    function cellColor(count) {
+      if (count === 0) return 'var(--bg4)';
+      const intensity = count / maxCount;
+      if (intensity < 0.25) return 'rgba(204,51,51,0.25)';
+      if (intensity < 0.50) return 'rgba(204,51,51,0.45)';
+      if (intensity < 0.75) return 'rgba(204,51,51,0.65)';
+      return '#cc3333';
+    }
+
+    // Group days into weeks (columns)
+    const weeks = [];
+    let week = [];
+    // Pad start so first day aligns with correct weekday column
+    for (let i = 0; i < days[0].dow; i++) week.push(null);
+    days.forEach(d => {
+      week.push(d);
+      if (week.length === 7) { weeks.push(week); week = []; }
+    });
+    if (week.length) {
+      while (week.length < 7) week.push(null);
+      weeks.push(week);
+    }
+
+    const DOW_LABELS = ['S','M','T','W','T','F','S'];
+    const CELL = 14, GAP = 3;
+
+    // Build SVG
+    const svgW = weeks.length * (CELL + GAP) + 28;
+    const svgH = 7 * (CELL + GAP) + 24;
+
+    let cells = '';
+    weeks.forEach((wk, wi) => {
+      wk.forEach((day, di) => {
+        if (!day) return;
+        const x = 26 + wi * (CELL + GAP);
+        const y = 20 + di * (CELL + GAP);
+        const monthDay = day.date.slice(5); // MM-DD
+        cells += `<rect x="${x}" y="${y}" width="${CELL}" height="${CELL}"
+          rx="2" fill="${cellColor(day.count)}"
+          style="cursor:${day.count>0?'pointer':'default'}"
+          data-tip="${day.date}: ${day.count} anomal${day.count===1?'y':'ies'}">
+          <title>${day.date}: ${day.count} anomal${day.count===1?'y':'ies'}</title>
+        </rect>`;
+      });
+    });
+
+    // Weekday labels on left
+    const dowLabels = DOW_LABELS.map((l, i) => {
+      if (i % 2 === 0) return ''; // only show M, W, F, S to avoid clutter
+      const y = 20 + i * (CELL + GAP) + CELL / 2 + 4;
+      return `<text x="18" y="${y}" fill="#5a5a5a" font-size="9" text-anchor="middle"
+        font-family="IBM Plex Mono, monospace">${l}</text>`;
+    }).join('');
+
+    // Month labels across top — show label at first week of each month
+    let monthLabels = '';
+    let lastMonth = '';
+    weeks.forEach((wk, wi) => {
+      const firstReal = wk.find(d => d !== null);
+      if (!firstReal) return;
+      const m = firstReal.date.slice(0, 7);
+      if (m !== lastMonth) {
+        lastMonth = m;
+        const x = 26 + wi * (CELL + GAP);
+        const label = new Date(firstReal.date).toLocaleDateString('en-IN', { month: 'short' });
+        monthLabels += `<text x="${x}" y="13" fill="#5a5a5a" font-size="9"
+          font-family="IBM Plex Mono, monospace">${label}</text>`;
+      }
+    });
+
+    const svg = `<svg width="${svgW}" height="${svgH}" xmlns="http://www.w3.org/2000/svg">
+      ${dowLabels}
+      ${monthLabels}
+      ${cells}
+    </svg>`;
+
+    const wrap = document.getElementById('heatmap-wrap');
+    if (wrap) wrap.innerHTML = svg;
+  })();
+
+</script>
+</body>
+</html>

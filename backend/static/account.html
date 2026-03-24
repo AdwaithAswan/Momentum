@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Momentum — Account Detail</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app-shell">
+
+  <header class="topbar" id="topbar"></header>
+  <nav class="sidebar" id="sidebar"></nav>
+
+  <main class="main">
+    <div class="page-header">
+      <div class="breadcrumb">MOMENTUM / <a href="dashboard.html">DASHBOARD</a> / ACCOUNT</div>
+      <h1>Account Detail</h1>
+      <p>All transactions for a selected account, with flagged entries highlighted.</p>
+    </div>
+
+    <div class="panel mb16">
+      <div class="panel-body" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <label style="font-size:12px;color:var(--text2);white-space:nowrap">Select Account:</label>
+        <select class="select" id="account-select" style="width:200px"></select>
+        <button class="btn btn-primary btn-sm" id="load-btn">Load</button>
+        <span class="text-faint text-sm" id="acc-hint">or click an account link from the Flagged Transactions page</span>
+      </div>
+    </div>
+
+    <div class="stat-grid" id="acc-stats" style="display:none"></div>
+
+    <div id="acc-content" style="display:none">
+      <div class="two-col mb16">
+        <div class="panel">
+          <div class="panel-header">Transaction History (last 30 days)</div>
+          <div class="panel-body">
+            <div class="histo" id="histo" style="height:60px"></div>
+            <div class="flex justify-between mt8">
+              <span class="text-faint text-sm">Older</span>
+              <span class="text-faint text-sm">Recent</span>
+            </div>
+            <div class="flex gap12 mt8">
+              <span style="font-size:11px;color:var(--text3)"><span style="display:inline-block;width:10px;height:10px;background:var(--bg4);border-radius:1px;margin-right:4px;vertical-align:middle"></span>Normal</span>
+              <span style="font-size:11px;color:var(--accent)"><span style="display:inline-block;width:10px;height:10px;background:rgba(204,51,51,0.5);border-radius:1px;margin-right:4px;vertical-align:middle"></span>Flagged</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">Account Profile</div>
+          <div class="panel-body">
+            <div class="detail-grid" id="acc-profile"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <div class="table-toolbar">
+          <span class="title">All Transactions</span>
+          <select class="select" id="acc-filter-flag">
+            <option value="">All</option>
+            <option value="1">Flagged only</option>
+            <option value="0">Clean only</option>
+          </select>
+          <span style="flex:1"></span>
+          <span id="acc-count" class="text-faint text-sm"></span>
+        </div>
+        <div style="overflow-x:auto">
+          <table>
+            <thead>
+              <tr>
+                <th>Transaction ID</th>
+                <th>Date &amp; Time</th>
+                <th>Type</th>
+                <th>Amount</th>
+                <th>Channel</th>
+                <th>Risk Score</th>
+                <th>Status</th>
+                <th>Anomaly</th>
+              </tr>
+            </thead>
+            <tbody id="acc-txn-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="acc-empty" class="empty">
+      <div class="icon">&#9678;</div>
+      <p>Select an account above to view its transaction history.</p>
+    </div>
+
+  </main>
+</div>
+
+<script src="data.js"></script>
+<script>
+  document.getElementById('topbar').innerHTML = Utils.topbar('ready');
+  document.getElementById('sidebar').innerHTML = Utils.sidebar('account');
+
+  /* Use live data if available */
+  const ALL_TXN = getTransactions();
+
+  const allAccounts = [...new Set(ALL_TXN.map(t => t.account))].sort();
+  const sel = document.getElementById('account-select');
+  allAccounts.forEach(a => {
+    const o = document.createElement('option');
+    o.value = a; o.textContent = a;
+    sel.appendChild(o);
+  });
+
+  /* Check for URL param ?acc=ACC-XXXX */
+  const urlAcc = new URLSearchParams(window.location.search).get('acc');
+  if (urlAcc && allAccounts.includes(urlAcc)) {
+    sel.value = urlAcc;
+    loadAccount(urlAcc);
+  }
+
+  document.getElementById('load-btn').addEventListener('click', () => loadAccount(sel.value));
+  document.getElementById('acc-filter-flag').addEventListener('change', () => {
+    if (currentAcc) renderTable(currentAcc);
+  });
+
+  let currentAcc = null;
+
+  function loadAccount(acc) {
+    if (!acc) return;
+    currentAcc = acc;
+    const txns    = ALL_TXN.filter(t => t.account === acc);
+    const flagged = txns.filter(t => t.flag === 1);
+    const total   = txns.reduce((s, t) => s + t.amount, 0);
+    const maxScore = flagged.length ? Math.max(...flagged.map(t => t.score)) : 0;
+
+    document.getElementById('acc-stats').style.display   = '';
+    document.getElementById('acc-content').style.display = '';
+    document.getElementById('acc-empty').style.display   = 'none';
+
+    document.getElementById('acc-stats').innerHTML = [
+      { label:'Account ID',         value: acc,                         sub:'' },
+      { label:'Total Transactions', value: txns.length,                 sub:'in dataset' },
+      { label:'Flagged',            value: flagged.length,              sub:'anomalies detected', highlight: flagged.length > 0 },
+      { label:'Total Volume',       value: Utils.fmt.currency(total),   sub:'combined amount' },
+      { label:'Highest Risk Score', value: maxScore || '—',             sub:'max anomaly score' },
+    ].map(s => `
+      <div class="stat-card ${s.highlight ? 'highlight' : ''}">
+        <div class="label">${s.label}</div>
+        <div class="value">${s.value}</div>
+        <div class="sub">${s.sub}</div>
+      </div>
+    `).join('');
+
+    const types     = [...new Set(txns.map(t => t.type))];
+    const anomalies = [...new Set(flagged.flatMap(t => t.anomaly.split(',').map(a => a.trim())))].filter(Boolean);
+    document.getElementById('acc-profile').innerHTML = `
+      <div class="detail-item"><div class="dl">Transaction Types</div><div class="dv text-sm">${types.join(', ') || '—'}</div></div>
+      <div class="detail-item"><div class="dl">Branches</div><div class="dv mono">${[...new Set(txns.map(t => t.branch))].join(', ')}</div></div>
+      <div class="detail-item"><div class="dl">Date Range</div><div class="dv">${txns[0]?.date || '—'} to ${txns[txns.length-1]?.date || '—'}</div></div>
+      <div class="detail-item"><div class="dl">Detected Anomalies</div><div class="dv text-sm">${anomalies.join(', ') || 'None'}</div></div>
+    `;
+
+    /* Histogram */
+    const histo = document.getElementById('histo');
+    const bins  = 30;
+    const counts     = Array(bins).fill(0);
+    const flagCounts = Array(bins).fill(0);
+    const now = new Date();
+    txns.forEach(t => {
+      const d       = new Date(t.date);
+      const daysAgo = Math.floor((now - d) / 86400000);
+      const bin     = Math.min(bins - 1, Math.max(0, bins - 1 - daysAgo));
+      counts[bin]++;
+      if (t.flag) flagCounts[bin]++;
+    });
+    const maxBin = Math.max(...counts, 1);
+    histo.innerHTML = counts.map((c, i) => {
+      const h   = (c / maxBin * 100).toFixed(0);
+      const cls = flagCounts[i] > 0 ? 'flagged' : '';
+      return `<div class="histo-bar ${cls}" style="height:${h}%;min-height:${c>0?'4px':'2px'}"
+                   title="${c} txn${c!==1?'s':''}${flagCounts[i]?' ('+flagCounts[i]+' flagged)':''}"></div>`;
+    }).join('');
+
+    renderTable(acc);
+    document.getElementById('acc-hint').style.display = 'none';
+  }
+
+  function renderTable(acc) {
+    const flagFilter = document.getElementById('acc-filter-flag').value;
+    let txns = ALL_TXN.filter(t => t.account === acc);
+    if (flagFilter !== '') txns = txns.filter(t => String(t.flag) === flagFilter);
+
+    document.getElementById('acc-count').textContent = txns.length + ' transactions';
+    document.getElementById('acc-txn-body').innerHTML = txns.length ? txns.map(t => `
+      <tr style="${t.flag ? 'background:rgba(204,51,51,0.04);' : ''}">
+        <td class="mono">${t.id}</td>
+        <td class="dim">${t.date} <span class="text-faint">${t.time}</span></td>
+        <td>${t.type}</td>
+        <td class="mono">${Utils.fmt.currency(t.amount)}</td>
+        <td class="dim">${t.channel}</td>
+        <td>
+          ${t.flag ? `
+            <div class="score-bar-wrap">
+              <div class="score-bar"><div class="score-bar-fill" style="width:${t.score}%;background:${Utils.scoreColor(t.score)}"></div></div>
+              <div class="score-val">${t.score}</div>
+            </div>` : '<span class="text-faint text-sm">—</span>'}
+        </td>
+        <td>
+          ${t.flag
+            ? `<span class="risk ${t.risk}">&#9873; ${t.risk.toUpperCase()}</span>`
+            : `<span style="color:var(--green);font-size:12px">&#10003; Clean</span>`}
+        </td>
+        <td class="text-sm text-dim">${t.anomaly || '—'}</td>
+      </tr>
+    `).join('') : `<tr><td colspan="8"><div class="empty"><div class="icon">&#8856;</div><p>No transactions match filter.</p></div></td></tr>`;
+  }
+</script>
+</body>
+</html>

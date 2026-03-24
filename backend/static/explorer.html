@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Momentum — Anomaly Explorer</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app-shell">
+
+  <header class="topbar" id="topbar"></header>
+  <nav class="sidebar" id="sidebar"></nav>
+
+  <main class="main">
+    <div class="page-header">
+      <div class="breadcrumb">MOMENTUM / <a href="dashboard.html">DASHBOARD</a> / EXPLORER</div>
+      <h1>Anomaly Explorer</h1>
+      <p>Browse and filter flagged transactions by anomaly category.</p>
+    </div>
+
+    <div style="display:grid;grid-template-columns:280px 1fr;gap:20px;align-items:start">
+
+      <div>
+        <div class="panel">
+          <div class="panel-header">
+            Anomaly Types
+            <button class="btn btn-ghost btn-sm" id="clear-type" style="display:none">Clear</button>
+          </div>
+          <div id="type-list" style="padding:8px 0"></div>
+        </div>
+
+        <div class="panel mt16">
+          <div class="panel-header">Filter by Risk</div>
+          <div style="padding:12px 16px;display:flex;flex-direction:column;gap:6px">
+            <label class="flex align-center gap8" style="cursor:pointer;font-size:13px">
+              <input type="checkbox" class="risk-check" value="high" checked> <span class="risk high">HIGH</span>
+            </label>
+            <label class="flex align-center gap8" style="cursor:pointer;font-size:13px">
+              <input type="checkbox" class="risk-check" value="medium" checked> <span class="risk medium">MEDIUM</span>
+            </label>
+            <label class="flex align-center gap8" style="cursor:pointer;font-size:13px">
+              <input type="checkbox" class="risk-check" value="low" checked> <span class="risk low">LOW</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="panel mb16" id="type-desc-card" style="display:none;border-color:var(--accent)">
+          <div class="panel-header" id="type-desc-title" style="color:var(--accent2)"></div>
+          <div class="panel-body text-sm" id="type-desc-body" style="color:var(--text2);line-height:1.8"></div>
+        </div>
+
+        <div class="table-wrap">
+          <div class="table-toolbar">
+            <span class="title" id="table-label">All Flagged Transactions</span>
+            <span style="flex:1"></span>
+            <span id="exp-count" class="text-faint text-sm"></span>
+          </div>
+          <div style="overflow-x:auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>Transaction ID</th>
+                  <th>Account</th>
+                  <th>Date &amp; Time</th>
+                  <th>Type</th>
+                  <th>Amount</th>
+                  <th>Score</th>
+                  <th>Risk</th>
+                  <th>Anomaly Types</th>
+                </tr>
+              </thead>
+              <tbody id="exp-body"></tbody>
+            </table>
+          </div>
+          <div class="pagination" id="exp-pagination"></div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script src="data.js"></script>
+<script>
+  document.getElementById('topbar').innerHTML = Utils.topbar('ready');
+  document.getElementById('sidebar').innerHTML = Utils.sidebar('explorer');
+
+  /* Use live data */
+  const ALL_DATA = getTransactions();
+  const flagged  = ALL_DATA.filter(t => t.flag === 1);
+
+  /* Build anomaly type summary from live data */
+  const liveTypes = {};
+  flagged.forEach(t => {
+    if (!t.anomaly) return;
+    t.anomaly.split(',').forEach(a => {
+      const k = a.trim();
+      if (!k) return;
+      if (!liveTypes[k]) liveTypes[k] = { name:k, count:0, risk:'low', desc:'' };
+      liveTypes[k].count++;
+      if (t.risk === 'high')        liveTypes[k].risk = 'high';
+      else if (t.risk === 'medium' && liveTypes[k].risk !== 'high') liveTypes[k].risk = 'medium';
+    });
+  });
+
+  // Merge descriptions from ANOMALY_TYPES constant where available
+  ANOMALY_TYPES.forEach(at => {
+    if (liveTypes[at.name]) liveTypes[at.name].desc = at.desc;
+  });
+
+  const typeData = Object.keys(liveTypes).length ? Object.values(liveTypes) : ANOMALY_TYPES;
+
+  let selectedType = null;
+  let page = 1;
+  const PER = 8;
+
+  const maxCount = Math.max(...typeData.map(a => a.count), 1);
+  document.getElementById('type-list').innerHTML = [...typeData]
+    .sort((a, b) => b.count - a.count)
+    .map(a => `
+      <div class="type-item" data-type="${a.name}" style="
+        padding:10px 16px;cursor:pointer;border-left:2px solid transparent;
+        transition:all .1s;display:flex;align-items:center;gap:10px">
+        <div style="flex:1">
+          <div style="font-size:12.5px;color:var(--text)">${a.name}</div>
+          <div style="height:3px;background:var(--bg4);border-radius:2px;margin-top:5px;overflow:hidden">
+            <div style="height:100%;width:${a.count/maxCount*100}%;background:${a.risk==='high'?'var(--accent)':a.risk==='medium'?'var(--yellow)':'var(--green)'};border-radius:2px"></div>
+          </div>
+        </div>
+        <span class="risk ${a.risk}" style="font-size:10px">${a.count}</span>
+      </div>
+    `).join('');
+
+  document.querySelectorAll('.type-item').forEach(el => {
+    el.addEventListener('click', () => {
+      const t = el.dataset.type;
+      if (selectedType === t) {
+        clearTypeSelection();
+      } else {
+        selectedType = t;
+        document.querySelectorAll('.type-item').forEach(i => {
+          i.style.borderLeftColor = 'transparent';
+          i.style.background = '';
+        });
+        el.style.borderLeftColor = 'var(--accent)';
+        el.style.background = 'var(--accentdim)';
+        document.getElementById('clear-type').style.display = '';
+
+        const info = typeData.find(a => a.name === t);
+        if (info && info.desc) {
+          document.getElementById('type-desc-card').style.display = '';
+          document.getElementById('type-desc-title').textContent = t;
+          document.getElementById('type-desc-body').textContent  = info.desc;
+        } else {
+          document.getElementById('type-desc-card').style.display = 'none';
+        }
+        document.getElementById('table-label').textContent = t;
+      }
+      page = 1;
+      render();
+    });
+  });
+
+  function clearTypeSelection() {
+    selectedType = null;
+    document.querySelectorAll('.type-item').forEach(i => {
+      i.style.borderLeftColor = 'transparent';
+      i.style.background = '';
+    });
+    document.getElementById('clear-type').style.display = 'none';
+    document.getElementById('type-desc-card').style.display = 'none';
+    document.getElementById('table-label').textContent = 'All Flagged Transactions';
+  }
+
+  document.getElementById('clear-type').addEventListener('click', () => {
+    clearTypeSelection();
+    page = 1;
+    render();
+  });
+
+  document.querySelectorAll('.risk-check').forEach(cb => cb.addEventListener('change', () => { page=1; render(); }));
+
+  function getFiltered() {
+    const risks = [...document.querySelectorAll('.risk-check:checked')].map(c => c.value);
+    return flagged.filter(t => {
+      if (!risks.includes(t.risk)) return false;
+      if (selectedType && !t.anomaly.includes(selectedType)) return false;
+      return true;
+    });
+  }
+
+  function render() {
+    const filtered = getFiltered();
+    const slice    = Utils.paginate(filtered, page, PER);
+    document.getElementById('exp-count').textContent = filtered.length + ' transactions';
+
+    document.getElementById('exp-body').innerHTML = slice.length ? slice.map(t => `
+      <tr onclick="window.location='flagged.html'" style="cursor:pointer">
+        <td class="mono">${t.id}</td>
+        <td class="mono"><a href="account.html?acc=${t.account}" onclick="event.stopPropagation()" style="color:var(--accent2);text-decoration:none">${t.account}</a></td>
+        <td class="dim">${t.date} <span class="text-faint">${t.time}</span></td>
+        <td>${t.type}</td>
+        <td class="mono">${Utils.fmt.currency(t.amount)}</td>
+        <td>
+          <div class="score-bar-wrap">
+            <div class="score-bar"><div class="score-bar-fill" style="width:${t.score}%;background:${Utils.scoreColor(t.score)}"></div></div>
+            <div class="score-val">${t.score}</div>
+          </div>
+        </td>
+        <td><span class="risk ${t.risk}">${t.risk.toUpperCase()}</span></td>
+        <td class="text-sm" style="color:var(--text2)">
+          ${(t.anomaly || '').split(',').map(a => a.trim()).filter(Boolean).map(a =>
+            `<span class="tag ${selectedType && a===selectedType ? 'active' : ''}" style="margin:1px">${a}</span>`
+          ).join('')}
+        </td>
+      </tr>
+    `).join('') : `<tr><td colspan="8"><div class="empty"><div class="icon">&#8856;</div><p>No transactions match selection.</p></div></td></tr>`;
+
+    const total = Math.ceil(filtered.length / PER);
+    const pag = document.getElementById('exp-pagination');
+    if (total <= 1) { pag.innerHTML = ''; return; }
+    let html = `<span class="info">Page ${page} of ${total}</span>`;
+    html += `<button class="page-btn" onclick="goPage(${page-1})" ${page===1?'disabled':''}>&#8249;</button>`;
+    for (let i=1; i<=total; i++) html += `<button class="page-btn ${i===page?'active':''}" onclick="goPage(${i})">${i}</button>`;
+    html += `<button class="page-btn" onclick="goPage(${page+1})" ${page===total?'disabled':''}>&#8250;</button>`;
+    pag.innerHTML = html;
+  }
+
+  window.goPage = n => { page = n; render(); };
+  render();
+</script>
+</body>
+</html>
