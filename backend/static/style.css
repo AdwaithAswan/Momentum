@@ -1,7 +1,7 @@
-/* ============================================================
+/* 
    MOMENTUM — Audit Frontend — Shared Styles
    Dark / Industrial / Utilitarian
-   ============================================================ */
+   */
 
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
 
@@ -26,7 +26,7 @@
   --radius:    3px;
 }
 
-/* ---- Reset ---- */
+/*  Reset  */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { font-size: 14px; scroll-behavior: smooth; }
 body {
@@ -43,7 +43,7 @@ body {
   background-size: 40px 40px;
 }
 
-/* ---- Layout ---- */
+/*Layout*/
 .app-shell {
   display: grid;
   grid-template-columns: 220px 1fr;
@@ -51,7 +51,7 @@ body {
   min-height: 100vh;
 }
 
-/* ---- Top Bar ---- */
+/*Top Bar */
 .topbar {
   grid-column: 1 / -1;
   background: var(--bg2);
@@ -148,14 +148,14 @@ body {
   line-height: 1.4;
 }
 
-/* ---- Main Content ---- */
+/*main content*/
 .main {
   padding: 28px 32px;
   overflow-y: auto;
   max-width: 1400px;
 }
 
-/* ---- Page Header ---- */
+/* page header */
 .page-header {
   margin-bottom: 28px;
   border-bottom: 1px solid var(--border);
@@ -183,7 +183,7 @@ body {
 .page-header .breadcrumb a { color: var(--text3); text-decoration: none; }
 .page-header .breadcrumb a:hover { color: var(--text2); }
 
-/* ---- Stat Cards ---- */
+/* stats */
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -219,7 +219,7 @@ body {
 .stat-card.highlight { border-color: var(--accent); }
 .stat-card.highlight .value { color: var(--accent2); }
 
-/* ---- Tables ---- */
+/*tables */
 .table-wrap {
   background: var(--bg2);
   border: 1px solid var(--border);
@@ -276,7 +276,7 @@ tbody td {
 tbody td.mono { font-family: var(--mono); font-size: 12px; }
 tbody td.dim { color: var(--text2); }
 
-/* ---- Risk Badge ---- */
+/*risk */
 .risk {
   display: inline-block;
   font-family: var(--mono);
@@ -290,7 +290,7 @@ tbody td.dim { color: var(--text2); }
 .risk.medium { background: rgba(201,150,42,0.15); color: #e0ac44; border: 1px solid rgba(201,150,42,0.3); }
 .risk.low    { background: rgba(58,158,110,0.12); color: #52c491; border: 1px solid rgba(58,158,110,0.25); }
 
-/* ---- Score Bar ---- */
+/* score bar */
 .score-bar-wrap { display: flex; align-items: center; gap: 8px; }
 .score-bar {
   flex: 1; height: 4px;
@@ -302,7 +302,7 @@ tbody td.dim { color: var(--text2); }
 .score-bar-fill { height: 100%; border-radius: 2px; }
 .score-val { font-family: var(--mono); font-size: 11px; color: var(--text2); min-width: 28px; }
 
-/* ---- Inputs ---- */
+/* input */
 .input, .select {
   background: var(--bg3);
   border: 1px solid var(--border2);
@@ -318,7 +318,7 @@ tbody td.dim { color: var(--text2); }
 .input::placeholder { color: var(--text3); }
 .select option { background: var(--bg3); }
 
-/* ---- Buttons ---- */
+/* buttons */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -348,7 +348,7 @@ tbody td.dim { color: var(--text2); }
 .btn-ghost:hover { background: var(--bg3); color: var(--text); border-color: var(--border2); }
 .btn-sm { padding: 5px 10px; font-size: 11.5px; }
 
-/* ---- Panels / Cards ---- */
+/* pannels */
 .panel {
   background: var(--bg2);
   border: 1px solid var(--border);
@@ -379,7 +379,7 @@ tbody td.dim { color: var(--text2); }
 .bar-fill.yellow { background: var(--yellow); }
 .bar-count { font-family: var(--mono); font-size: 11px; color: var(--text3); min-width: 32px; text-align: right; }
 
-/* ---- Upload Drop Zone ---- */
+/* upload drag and drop */
 .dropzone {
   border: 2px dashed var(--border2);
   border-radius: 4px;
@@ -396,7 +396,7 @@ tbody td.dim { color: var(--text2); }
 .dropzone .dz-title { font-size: 14px; font-weight: 500; color: var(--text); margin-bottom: 4px; }
 .dropzone .dz-sub { font-size: 12px; color: var(--text3); }
 
-/* ---- Progress / Pipeline ---- */
+/*progress */
 .pipeline {
   display: flex;
   align-items: center;
@@ -456,7 +456,7 @@ tbody td.dim { color: var(--text2); }
 .pipeline-step.done .pipeline-label { color: var(--green); }
 .pipeline-step.active .pipeline-label { color: var(--text2); }
 
-/* ---- Sparkline (CSS horizontal histogram) ---- */
+/* histogram */
 .histo { display: flex; align-items: flex-end; gap: 2px; height: 40px; }
 .histo-bar {
   flex: 1;
@@ -468,7 +468,7 @@ tbody td.dim { color: var(--text2); }
 .histo-bar:hover { background: var(--accent); }
 .histo-bar.flagged { background: rgba(204,51,51,0.5); }
 
-/* ---- Tag ---- */
+/* tag */
 .tag {
   display: inline-block;
   font-family: var(--mono);
@@ -482,7 +482,7 @@ tbody td.dim { color: var(--text2); }
 }
 .tag.active { border-color: var(--accent); color: var(--accent2); background: var(--accentdim); }
 
-/* ---- Pagination ---- */
+/* pagination */
 .pagination {
   display: flex;
   align-items: center;
@@ -507,7 +507,7 @@ tbody td.dim { color: var(--text2); }
 .page-btn:hover { background: var(--bg3); color: var(--text); }
 .page-btn.active { background: var(--accentdim); border-color: var(--accent); color: var(--accent2); }
 
-/* ---- Empty state ---- */
+/* empty */
 .empty {
   text-align: center;
   padding: 48px 24px;
@@ -516,7 +516,7 @@ tbody td.dim { color: var(--text2); }
 .empty .icon { font-size: 32px; margin-bottom: 12px; opacity: 0.3; }
 .empty p { font-size: 13px; }
 
-/* ---- Notification toast ---- */
+/*notification */
 .toast {
   position: fixed;
   bottom: 24px; right: 24px;
@@ -537,7 +537,7 @@ tbody td.dim { color: var(--text2); }
 .toast.show { transform: translateY(0); opacity: 1; }
 .toast.error { border-left-color: var(--accent); }
 
-/* ---- Modal ---- */
+/* modal */
 .modal-overlay {
   position: fixed; inset: 0;
   background: rgba(0,0,0,0.7);
@@ -574,7 +574,7 @@ tbody td.dim { color: var(--text2); }
 .modal-close:hover { color: var(--text); background: var(--bg3); }
 .modal-body { padding: 20px; }
 
-/* ---- Detail rows ---- */
+/* detail rows*/
 .detail-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -584,13 +584,13 @@ tbody td.dim { color: var(--text2); }
 .detail-item .dv { font-size: 13px; color: var(--text); }
 .detail-item .dv.mono { font-family: var(--mono); }
 
-/* ---- Scrollbar ---- */
+/* scroll bar */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: var(--bg); }
 ::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--border2); }
 
-/* ---- Utility ---- */
+/* utility */
 .mt8  { margin-top: 8px; }
 .mt16 { margin-top: 16px; }
 .mt24 { margin-top: 24px; }

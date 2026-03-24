@@ -9,7 +9,7 @@ from app.utils.file_handler import save_file, save_output
 
 bp = Blueprint('main', __name__)
 
-
+#input the file
 @bp.route('/upload', methods=['POST'])
 def upload():
     if 'file' not in request.files:
@@ -19,12 +19,13 @@ def upload():
     if not file.filename:
         return jsonify({'error': 'Empty filename'}), 400
 
+    #starts timer to keep track of processing time
     start_ms = time.time()
 
     try:
         file_path = save_file(file)
 
-        # Read CSV or Excel
+        
         if file.filename.lower().endswith('.xlsx'):
             df = pd.read_excel(file_path)
         else:
@@ -32,29 +33,28 @@ def upload():
 
         total_records = len(df)
 
-        # Preprocess → feature engineering → anomaly detection
+        #ml pipeline
         df, balance_col, withdraw_col, deposit_col = preprocess(df)
         df, features = create_features(df, balance_col, withdraw_col, deposit_col)
         df = detect_anomalies(df, df[features])
 
         processing_ms = int((time.time() - start_ms) * 1000)
 
-        # Save full output
+        #output file
         save_output(df, "fraud_output.csv")
 
-        # Prepare response — return ALL rows so the frontend can show clean ones too
+        
         df_out = df.fillna('')
 
-        # ── Normalise column names for the frontend mapper ───────────────────
+       #required output parameters
         df_out['flag']  = df_out['Anomaly'].astype(int)
-        df_out['score'] = df_out['Score']   # 0-1 float; frontend converts to %
-        df_out['risk']  = df_out['Risk']    # "High Risk" / "Medium Risk" / "Low Risk"
+        df_out['score'] = df_out['Score']   
+        df_out['risk']  = df_out['Risk']    
 
-        # anomaly_type — already set by anomaly_detector; ensure column exists
         if 'anomaly_type' not in df_out.columns:
             df_out['anomaly_type'] = ''
 
-        # ── Resolve account_id from whatever column the CSV uses ─────────────
+        #similar other column names
         acct_keywords = ['ACCOUNT_ID', 'ACCOUNT ID', 'ACCOUNTID', 'ACCT_ID',
                          'ACCOUNT NO', 'ACCOUNT NUMBER', 'ACCOUNT_NO',
                          'ACC_ID', 'ACCOUNT', 'ACCT']
@@ -73,7 +73,7 @@ def upload():
             # last resort: generate synthetic account IDs from row index
             df_out['account_id'] = ['ACC-' + str(i).zfill(4) for i in range(len(df_out))]
 
-        # ── Resolve transaction_id similarly ─────────────────────────────────
+        
         txn_keywords = ['TRANSACTION_ID', 'TRANSACTION ID', 'TXN_ID', 'TXN ID',
                         'TRANS_ID', 'TRANSACTIONID', 'ID']
         txn_col_found = None
@@ -92,12 +92,12 @@ def upload():
 
         fraud_count = int(df_out['flag'].sum())
 
-        # Return up to 500 rows (flagged first, then clean) for the UI
+        
         flagged_rows = df_out[df_out['flag'] == 1]
         clean_rows   = df_out[df_out['flag'] == 0].head(100)
         combined     = pd.concat([flagged_rows, clean_rows])
         rows = combined.to_dict(orient='records')
-
+        #return
         return jsonify({
             'message':       'Fraud detection complete',
             'fraud_count':   fraud_count,

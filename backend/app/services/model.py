@@ -5,15 +5,15 @@ from config import MODEL_PATH
 
 
 def train_model(X):
-    """Train IsolationForest, always fast regardless of input size."""
+    """Train IsolationForest"""
 
-    # Convert to numpy for speed
+    # Convert to numpy 
     X_vals = X.values if hasattr(X, 'values') else np.array(X)
 
-    # Replace any NaN/inf that slipped through
+    # Replace any NaN/inf 
     X_vals = np.nan_to_num(X_vals, nan=0.0, posinf=0.0, neginf=0.0)
 
-    # Cap training sample at 3000 rows — statistically sufficient for IsolationForest
+    
     if len(X_vals) > 3000:
         idx    = np.random.choice(len(X_vals), 3000, replace=False)
         X_fit  = X_vals[idx]
@@ -30,4 +30,4 @@ def train_model(X):
     model.fit(X_fit)
     joblib.dump(model, MODEL_PATH)
 
-    return model, X_vals   # return X_vals so caller can score all rows
+    return model, X_vals   

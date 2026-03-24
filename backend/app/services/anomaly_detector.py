@@ -4,13 +4,13 @@ from .model import train_model
 
 
 def detect_anomalies(df, X):
-    """Run IsolationForest on X, add Score / Anomaly / Risk / anomaly_type columns to df."""
+    """Run IsolationForest on X adds score risk anomaly type."""
 
-    model, X_vals = train_model(X)   # returns trained model + cleaned numpy array
+    model, X_vals = train_model(X)   
 
     df = df.copy()
 
-    # ── Scores + flags (vectorised — fast on any size) ───────────────────────
+    
     raw_scores        = model.decision_function(X_vals)
     df['Score']       = -raw_scores
 
@@ -20,21 +20,20 @@ def detect_anomalies(df, X):
     predictions   = model.predict(X_vals)
     df['Anomaly'] = np.where(predictions == -1, 1, 0)
 
-    # ── Risk level (vectorised) ───────────────────────────────────────────────
+    
     df['Risk'] = pd.cut(
         df['Score'],
         bins=[-0.001, 0.50, 0.75, 1.001],
         labels=['Low Risk', 'Medium Risk', 'High Risk']
     ).astype(str)
 
-    # ── Rule-based anomaly type labeller (fully vectorised — no row loops) ───
     df['anomaly_type'] = ''
 
     flagged = df['Anomaly'] == 1
     if flagged.sum() == 0:
-        return df   # nothing flagged — skip labelling
+        return df   
 
-    # Locate key columns once
+    
     amount_col = next((c for c in df.columns if c == 'Amount'), None)
     if amount_col is None:
         amount_col = next((c for c in df.columns if 'AMOUNT' in c.upper()), None)
@@ -44,10 +43,10 @@ def detect_anomalies(df, X):
     acct_col = next((c for c in df.columns
                      if any(k in c.upper() for k in ['ACCOUNT', 'ACCT', 'ACC_ID'])), None)
 
-    # Work only on the flagged subset
+    
     fi = df[flagged].index
 
-    # Pre-compute amount series for flagged rows
+    
     if amount_col:
         abs_amt = df.loc[fi, amount_col].abs().astype(float)
         median_amt = df[amount_col].abs().median()
@@ -55,7 +54,7 @@ def detect_anomalies(df, X):
         abs_amt    = pd.Series(0.0, index=fi)
         median_amt = 1.0
 
-    # Build a dict of label → boolean mask (all vectorised)
+   
     label_masks = {}
 
     # 1. Unusually Large Transaction
@@ -107,12 +106,12 @@ def detect_anomalies(df, X):
     # 7. Sudden Behaviour Change — borderline score, no other label matched yet
     label_masks['Sudden Behaviour Change'] = df.loc[fi, 'Score'] <= 0.55
 
-    # ── Combine labels per row ────────────────────────────────────────────────
-    # Build a DataFrame of booleans: rows=flagged_idx, cols=label names
+    
+    
     label_df = pd.DataFrame({k: v.reindex(fi).fillna(False)
                               for k, v in label_masks.items()})
 
-    # For each row, join the True column names with ', '
+    
     def row_labels(row):
         matched = [col for col, val in row.items() if val]
         # Remove lower-priority labels when higher ones already match

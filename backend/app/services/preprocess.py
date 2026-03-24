@@ -4,8 +4,7 @@ import pandas as pd
 def preprocess(df):
     """Clean and normalise the uploaded CSV.
 
-    Returns (df, balance_col, withdraw_col, deposit_col).
-    Falls back gracefully when expected columns are absent.
+    
     """
     # Normalise column names: strip whitespace
     df.columns = df.columns.str.strip()
@@ -22,7 +21,7 @@ def preprocess(df):
     withdraw_col = find_col(df, ['WITHDRAWAL', 'DEBIT', 'WITHDRAW'])
     deposit_col  = find_col(df, ['DEPOSIT', 'CREDIT'])
 
-    # If expected money columns are absent, create synthetic ones from 'amount'
+   
     if not withdraw_col:
         amount_col = find_col(df, ['AMOUNT'])
         if amount_col:

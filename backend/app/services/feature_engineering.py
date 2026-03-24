@@ -24,7 +24,7 @@ def create_features(df, balance_col, withdraw_col, deposit_col):
 
     features = [withdraw_col, deposit_col, balance_col, 'Amount', 'Day', 'Month', 'Hour']
 
-    # Drop rows where ALL feature columns are NaN, then fill remaining NaN with 0
+    
     df[features] = df[features].fillna(0)
 
     return df, features
