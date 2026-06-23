@@ -328,9 +328,9 @@ Since the system runs locally without a database, we used browser localStorage t
 
 | Name | Role |
 |---|---|
-| Adwaith Shameer | Integration & Deployment — pipeline orchestration, frontend-backend communication, error handling, performance optimization |
-| Christeena Geejo | Frontend — UI/UX design, all 6 dashboard pages, chart visualizations, CSS theme |
-| Adwaith Aswakumar | Backend & ML — data preprocessing, feature engineering, Isolation Forest model, anomaly labeling rules |
+| Adwaith Shameer | Team Lead & Frontend Development — UI/UX design, implementation of all 6 dashboard pages, chart visualizations, CSS theme development, and team coordination |
+| Christeena Geejo | Backend & Machine Learning — data preprocessing, feature engineering, Isolation Forest implementation, anomaly detection pipeline, and model development |
+| Adwaith Aswakumar | Integration & Deployment — pipeline orchestration, frontend-backend communication, error handling, performance optimization, testing, and deployment support |
 
 ---
 
