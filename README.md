@@ -1,5 +1,7 @@
 # Momentum — Bank Anomaly Detection
 
+![Momentum Dashboard](docs/screenshots/03-dashboard-overview.png)
+
 > An auditor-focused anomaly detection system for co-operative bank transaction records, powered by unsupervised machine learning.
 
 ![Python](https://img.shields.io/badge/Python-3.9%2B-blue?style=flat-square&logo=python)
@@ -233,16 +235,55 @@ Column names are case-insensitive and flexible — `Account No`, `ACCT_ID`, `Wit
 
 ## Screenshots
 
-<!-- TODO: Replace with actual screenshots -->
+### Upload Page
 
-| Page | Description |
-|---|---|
-| ![Upload](TODO_ADD_SCREENSHOT) | Upload page with 5-step progress indicator and real-time run log |
-| ![Dashboard](TODO_ADD_SCREENSHOT) | Overview dashboard showing flagged count, risk distribution, anomaly type chart |
-| ![Flagged](TODO_ADD_SCREENSHOT) | Sortable, filterable table of all flagged transactions |
-| ![Explorer](TODO_ADD_SCREENSHOT) | Anomaly type explorer — click a type to see matching transactions |
+| Before Upload | After Upload |
+|--------------|--------------|
+| ![](docs/screenshots/01-upload-before.png) | ![](docs/screenshots/02-upload-after.png) |
 
-> **To add screenshots:** Take screenshots of the running application and save them to `docs/screenshots/`. Replace the `TODO_ADD_SCREENSHOT` placeholders above.
+Upload transaction files and monitor processing progress.
+
+---
+
+### Dashboard Overview
+
+| Overview Metrics | Analytics & Risk Distribution |
+|-----------------|-------------------------------|
+| ![](docs/screenshots/03-dashboard-overview.png) | ![](docs/screenshots/04-dashboard-analytics.png) |
+
+The dashboard provides high-level insights into anomalies, risk levels, transaction trends, and model outputs.
+
+---
+
+### Flagged Transactions
+
+![](docs/screenshots/05-flagged-transactions.png)
+
+Review all suspicious transactions with sorting and filtering capabilities.
+
+---
+
+### Account Detail View
+
+![](docs/screenshots/06-account-detail.png)
+
+Investigate account-level transaction history and anomaly behavior.
+
+---
+
+### Anomaly Explorer
+
+![](docs/screenshots/07-anomaly-explorer.png)
+
+Browse transactions grouped by anomaly type and analyze suspicious patterns.
+
+---
+
+### Export Reports
+
+![](docs/screenshots/08-export-reports.png)
+
+Export flagged transactions as CSV or JSON for audit documentation and reporting.
 
 ---
 
